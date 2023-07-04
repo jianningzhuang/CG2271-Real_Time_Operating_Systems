@@ -1,0 +1,283 @@
+
+Tutorial 4
+---------
+
+1a) Task A is Running and chooses to give up the CPU voluntarily, what state does it go to?
+
+Task A goes to the READY state
+
+osYield() to voluntarily go back to the READY state (time out)
+
+if need resource that is not available => BLOCKED state
+
+
+1b) Task A is Running and a higher priority Task B becomes Ready. What will happen?
+
+Task B goes into RUNNING state by scheduler
+
+Task A forced to go to the READY state
+
+Context switch occurs
+
+1c) After some time, Task B requests for some resource and is unable to acquire it. It is unable to proceed without this resource. What happens?
+ 
+if need resource that is not available => BLOCKED state
+
+Task B goes to BLOCKED state
+
+Task A becomes highest priority in READY state => RUNNING state
+
+1d) After 5ms, the resource required by Task B is available. What happens?
+
+Task B goes back to READY state once resources available
+
+Task B higher priority than Task A => context switch
+
+Task B goes into RUNNING state by scheduler
+
+Task A forced to go to the READY state
+
+
+
+SystemCoreClockUpdate(); //System Initialisation
+
+osKernelInitialize(); //set up low level support for OS
+
+2a) OS call, osThreadNew() takes in 3 parameters
+
+https://www.keil.com/pack/doc/CMSIS/RTOS2/html/group__CMSIS__RTOS__ThreadMgmt.html#ga48d68b8666d99d28fa646ee1d2182b8f
+
+osThreadId_t osThreadNew(osThreadFunc_t func, void *argument, const osThreadAttr_t *attr)
+		
+Parameters
+[in]	func	thread function.
+[in]	argument	pointer that is passed to the thread function as start argument.
+[in]	attr	thread attributes; NULL: default values.
+
+Returns
+thread ID for reference by other functions or NULL in case of error.
+The function osThreadNew starts a thread function by adding it to the list of active threads and sets it to state READY. Arguments for the thread function are passed using the parameter pointer *argument. When the priority of the created thread function is higher than the current RUNNING thread, the created thread function starts instantly and becomes the new RUNNING thread. Thread attributes are defined with the parameter pointer attr. Attributes include settings for thread priority, stack size, or memory allocation.
+
+The function can be safely called before the RTOS is started (call to osKernelStart), but not before it is initialized (call to osKernelInitialize).
+
+The function osThreadNew returns the pointer to the thread object identifier or NULL in case of an error.
+
+2b) When will app_main() be called?
+
+Not like a function call
+
+app_main() is a thread
+
+Once osKernelStart() function is called, multi-threaded environment has started
+At that time, there can be many tasks that are in the Ready State
+Only the task with the Highest Priority will run
+Priority of thread set in attr in osThreadNew(thread, arg, attr)
+
+
+2c) What is the purpose of for(;;) {} in app_main?
+
+In Embedded Operating Systems, most tasks are written in forever loops
+The state of the task will determine when they get to run
+No Exit State
+
+
+2extra) What is purpose of for(;;) {} in main
+
+no impact
+osKernelStart transitions to os environment
+for loop in main just for safety check
+
+3a) What happens to app_main() task when we call osDelay()?
+
+https://www.keil.com/pack/doc/CMSIS/RTOS2/html/group__CMSIS__RTOS__Wait.html#gaf6055a51390ef65b6b6edc28bf47322e
+
+
+osStatus_t osDelay(uint32_t ticks)
+	
+Parameters
+[in]	ticks	time ticks value
+
+Returns
+status code that indicates the execution status of the function.
+The function osDelay waits for a time period specified in kernel ticks. For a value of 1 the system waits until the next timer tick occurs. The actual time delay may be up to one timer tick less than specified, i.e. calling osDelay(1) right before the next system tick occurs the thread is rescheduled immediately.
+
+The delayed thread is put into the BLOCKED state and a context switch occurs immediately. The thread is automatically put back to the READY state after the given amount of ticks has elapsed. If the thread will have the highest priority in READY state it will be scheduled immediately.
+
+Possible osStatus_t return values:
+
+osOK: the time delay is executed.
+osErrorParameter: the time cannot be handled (zero value).
+osErrorISR: osDelay cannot be called from Interrupt Service Routines.
+osError: osDelay cannot be executed (kernel not running or no READY thread exists).
+Note
+This function cannot be called from Interrupt Service Routines.
+
+
+Delayed Thread is put into BLOCKED state and context switch occurs immediately
+put back to READY state after ticks
+
+By default, system is configured such that 1 tick is 1 ms
+1000 ticks = 1s
+osDelay(1000);
+
+
+3b) What will CPU execute during that delay time?
+
+If only 1 task and put into BLOCKED state
+
+led_red_thread
+RtxTimerThread
+RtxIdleThread
+
+in watcher
+keeping track of os
+
+OS has its own Idle Thread which will run if no other thread can make use of CPU
+
+
+3c) What if use normal delay?
+
+normal delay uses CPU to execute code to generate required delay
+
+osDelay() frees up CPU
+
+
+
+4a) Double Blinky 2 threads same priority
+
+
+red and green ON together, OFF together => yellow
+
+context switching happens the moment we call osDelay()
+
+red could be running then blocked, then green immediately run after context switch then block, then idle for about 1s
+
+time gap between red and green very short for context switching, almost look simultaneous
+
+red thread comes out of osDelay() slightly faster
+
+if normal delay used, still yellow?
+
+RTX_Config.h => OS_ROBIN_TIMEOUT  5
+
+Threads with same priority level have round robin behaviour => every 5 ticks do round robin switching
+----------
+
+
+
+Lab
+----------
+
+/*----------------------------------------------------------------------------
+ * CMSIS-RTOS 'main' function template
+ *---------------------------------------------------------------------------*/
+ 
+#include "RTE_Components.h"
+#include  CMSIS_device_header
+#include "cmsis_os2.h"
+
+#define RED_LED     18 // PortB Pin 18
+#define GREEN_LED   19 // PortB Pin 19
+#define BLUE_LED    1 // PortD Pin 1
+#define MASK(x)     (1 << (x))
+
+typedef enum {
+	red = 0,
+	green = 1,
+	blue = 2,
+} color_t;
+
+typedef enum {
+	led_off = 0,
+	led_on = 1,
+} state_t;
+ 
+
+void initLED(void) {
+	// Enable Clock to PORTB and PORTD
+	SIM->SCGC5 |= ((SIM_SCGC5_PORTB_MASK) | (SIM_SCGC5_PORTD_MASK));
+	
+	// Configure MUX settings to make all 3 pins GPIO
+	PORTB->PCR[RED_LED] &= ~PORT_PCR_MUX_MASK;
+	PORTB->PCR[RED_LED] |= PORT_PCR_MUX(1);
+	PORTB->PCR[GREEN_LED] &= ~PORT_PCR_MUX_MASK;
+	PORTB->PCR[GREEN_LED] |= PORT_PCR_MUX(1);
+	PORTD->PCR[BLUE_LED] &= ~PORT_PCR_MUX_MASK;
+	PORTD->PCR[BLUE_LED] |= PORT_PCR_MUX(1);
+	
+	// Set Data Direction Registers for PortB and PortD
+	PTB->PDDR |= (MASK(RED_LED) | MASK(GREEN_LED));
+	PTD->PDDR |= MASK(BLUE_LED);
+	
+}
+
+void offRGB(void){
+	PTB->PDOR = MASK(RED_LED) | MASK(GREEN_LED);
+	PTD->PDOR = MASK(BLUE_LED);
+}
+
+void ledControl(color_t color, state_t state){ 
+	switch (color){
+		case red:
+			if (state == led_off) {
+				PTB->PDOR |= MASK(RED_LED);
+			}
+			else {
+				PTB->PDOR &= ~MASK(RED_LED);  //active low LED
+			}
+			break;
+		case green:
+			if (state == led_off) {
+				PTB->PDOR |= MASK(GREEN_LED);
+			}
+			else {
+				PTB->PDOR &= ~MASK(GREEN_LED);  //active low LED
+			}
+			break;
+		case blue:
+			if (state == led_off) {
+				PTD->PDOR |= MASK(BLUE_LED);
+			}
+			else {
+				PTD->PDOR &= ~MASK(BLUE_LED);  //active low LED
+			}
+			break;
+		default:
+			offRGB();
+	}
+}
+
+static void delay(volatile uint32_t nof) {
+  while(nof!=0) {
+    __asm("NOP");
+    nof--;
+  }
+}
+
+/*----------------------------------------------------------------------------
+ * Application main thread
+ *---------------------------------------------------------------------------*/
+void app_main (void *argument) {
+  // ...
+  for (;;) {
+		ledControl(red, led_on);
+		osDelay(1000);
+		ledControl(red, led_off);
+		osDelay(1000);
+	}
+}
+ 
+int main (void) {
+ 
+  // System Initialization
+  SystemCoreClockUpdate();
+	initLED();
+	offRGB();
+  // ...
+ 
+  osKernelInitialize();                 // Initialize CMSIS-RTOS
+  osThreadNew(app_main, NULL, NULL);    // Create application main thread
+  osKernelStart();                      // Start thread execution
+  for (;;) {}
+}
+

@@ -1,0 +1,121 @@
+
+using normal delay still gives RED and GREEN together => yellow
+because RTX periodically switches between tasks in a round-robin manner for tasks with the same priority.
+
+change priority of red_led_thread > priority of green_led_thread
+
+set attribute:
+
+const osThreadAttr_t thread_attr = {
+	.priority = osPriorityNormal1
+};
+
+osThreadNew(led_red_thread, NULL, &thread_attr);
+
+1) What is the default priority level at which the led_green_thread is created?
+
+The default priority of RTX is osPriorityNormal. 
+Often you want to run a task with a higher or lower priority. 
+Using the osThreadAttr_t control structure you can set any initial priority required.
+
+2) What are the highest and lowest priority levels that can be assigned to a task?
+
+https://www.keil.com/pack/doc/CMSIS/RTOS2/html/group__CMSIS__RTOS__ThreadMgmt.html#gad4e3e0971b41f2d17584a8c6837342ec
+
+Lowest priority osPriorityIdle reserved for the Idle thread
+osPriorityLow next lowest
+osPriorityLow1 => priority: low + 1
+greater number => higher priority
+
+Highest priority osPriorityISR reserved for ISR deferred thread
+next highest osPriorityRealtime7
+
+3) State your observation. Explain why you see such a behaviour.
+
+Only the red led blinks
+The led_red_thread doesn’t give up the CPU and never goes into the BLOCKED state since doesn't use osDelay. 
+Since it is also higher priority, does not go into a round-robin with led_green thread.
+As such, we would expect that the green_led_thread doesn’t get a chance to run. 
+The expected behaviour would be that we only observe the red led blinking.
+
+----------------
+
+MUTEX
+
+the critical sections refers to the part of the code controlling the RGB LED.
+
+osMutexId_t myMutex;
+
+osKernelInitialize();                 // Initialize CMSIS-RTOS
+myMutex = osMutexNew(NULL);
+//threads
+osKernelStart();
+for (;;) {}
+
+osMutexAcquire(myMutex, osWaitForever);
+
+osMutexRelease(myMutex);
+
+4) both red and green acquire and release MUTEX
+
+RED blink then GREEN blink
+
+red_thread acquires Mutex first. 
+green_thread tries to acquire Mutex but Mutex locked by red_thread
+green_thread goes to BLOCKED state
+RED LED ON, DELAY, RED LED OFF
+red_thread releases Mutex (other threads waiting for this mutex becomes ready)
+green_thread becomes ready
+green_thread acquires Mutex
+red_thread tries to acquire Mutex but Mutex locked by green_thread
+red_thread goes to BLOCKED state
+GREEN LED ON, DELAY,GREEN LED OFF
+green_thread releases Mutex
+
+alternate between red and green
+
+5) red acquire and release, green acquire but does not release
+
+RED acquire and release
+GREEN only acquire NO release
+
+RED ON (1s) -> RED OFF (1s) -> GREEN ON (1s) -> GREEN OFF (1s) -> Nothing (Blocked forever Deadlock?)
+
+os does not know why you create Mutex
+
+GREEN goes to BLOCKED state even though trying to acquire same resource already using
+
+Mutex doenst allow to acquire again 
+
+No context switch to RED thread after GREEN OFF since RED thread already blocked
+
+osWaitForever => BLOCKED forever
+
+only the one who lock mutex can unlock
+
+
+6) only red acquire and release, green does own thing
+
+RED and GREEN together => yellow
+
+even though only RED acquire and releasing mutex
+
+os does not know why you create Mutex
+
+GREEN does not go to BLOCKED state since it is not acquiring Mutex even though same resource
+
+becomes same as Lab 6 OS_ROUND_ROBIN
+
+
+-----
+
+only the one who lock mutex can unlock
+
+
+---
+
+myStatus = osMutexAcquire(myMutex, 0);
+
+if (myStatus != osOK)
+
+else

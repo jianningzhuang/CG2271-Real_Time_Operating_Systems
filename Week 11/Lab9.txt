@@ -1,0 +1,82 @@
+1. osThreadFlagsSet
+
+osThreadFlagsSet(osThreadId_t  thread_id
+		uint32_t flags
+		)
+
+osThreadFlagsSet sets the thread flags for a thread specified by thread_id. Each thread has 31 thread flags already
+e.g TF1 = 0x00000001
+
+2. osThreadFlagsWait
+
+osThreadFlagsWait(uint32_t flags
+		  uint32_t options
+		  uint32_t timeout
+		  )
+
+flags specify which of the 31 flags to wait for
+options can be wait for any flag or wait for all flags in case waiting for multiple flags
+timeout is how long to stay in BLOCKED state while waiting for flag
+
+3. RED -> GREEN -> BLUE
+
+no OFF state seen for any LED
+
+controlthread releases flag for each LED at 1s intervals which line up with the ON/OFF timing
+
+void control_thread(void *argument) {
+	for (;;) {
+		
+		osThreadFlagsSet(redLED_Id, 0x00000001);
+		osDelay(1000);
+		osThreadFlagsSet(greenLED_Id, 0x00000001);
+		osDelay(1000);
+		osThreadFlagsSet(blueLED_Id, 0x00000001);
+		osDelay(1000);
+	
+	}
+}
+
+osThreadFlagsWait(0x00000001, osFlagsWaitAny, osWaitForever); //before each LED thread
+
+4. Event Flags
+
+led_flag = osEventFlagsNew(NULL);
+
+		osEventFlagsSet(led_flag, 0x00000001);
+		osDelay(1000);
+		osEventFlagsSet(led_flag, 0x00000010);
+		osDelay(1000);
+		osEventFlagsSet(led_flag, 0x00000100);
+		osDelay(1000);
+
+osEventFlagsWait(led_flag, 0x00000001, osFlagsWaitAny, osWaitForever); //Red
+osEventFlagsWait(led_flag, 0x00000010, osFlagsWaitAny, osWaitForever); //Green
+osEventFlagsWait(led_flag, 0x00000100, osFlagsWaitAny, osWaitForever); //Blue
+
+5. Message Queues
+
+	redMsg = osMessageQueueNew(MSG_COUNT, sizeof(myDataPkt), NULL);
+	greenMsg = osMessageQueueNew(MSG_COUNT, sizeof(myDataPkt), NULL);
+	blueMsg = osMessageQueueNew(MSG_COUNT, sizeof(myDataPkt), NULL);
+
+		myDataPkt myData;
+		
+		myData.cmd = 0x01;
+		myData.data = 0x01;
+		
+		osMessageQueuePut(redMsg, &myData, NULL, 0); //0 is timeout of how long to wait to put message in queue
+		osDelay(1000);
+		osMessageQueuePut(greenMsg, &myData, NULL, 0); //0 is timeout of how long to wait to put message in queue
+		osDelay(1000);
+		osMessageQueuePut(blueMsg, &myData, NULL, 0); //0 is timeout of how long to wait to put message in queue
+		osDelay(1000);
+
+		myDataPkt myRxData;
+		osMessageQueueGet(blueMsg, &myRxData, NULL, osWaitForever);
+		if (myRxData.cmd == 0x01 && myRxData.data == 0x01) {
+			ledControl(blue, led_on);
+			osDelay(1000);
+			ledControl(blue, led_off);
+			osDelay(1000);
+		}

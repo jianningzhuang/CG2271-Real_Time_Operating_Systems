@@ -1,0 +1,94 @@
+2. 
+
+const osThreadAttr_t priorityHigh = {
+  .priority = osPriorityHigh
+};
+
+const osThreadAttr_t priorityAboveNormal = {
+  .priority = osPriorityAboveNormal
+};
+
+const osThreadAttr_t priorityNormal = {
+  .priority = osPriorityNormal
+};
+
+
+osThreadNew(led_red_thread, NULL, &priorityHigh);
+
+osThreadNew(led_green_thread, NULL, &priorityAboveNormal);
+
+osThreadNew(led_blue_thread, NULL, &priorityNormal);
+
+void led_red_thread(void *argument) {
+  for (;;) {
+    osThreadFlagsWait(0x00000003, osFlagsWaitAll, osWaitForever);
+    ledControl(RED_LED, led_on);
+    osDelay(1000);
+    ledControl(RED_LED, led_off);
+  }
+}
+
+void led_green_thread(void *argument) {
+  for (;;) {
+    ledControl(GREEN_LED, led_on);
+    osDelay(1000);
+    osThreadFlagsSet(blueLED_ID, 0x00000001);
+    osDelay(1000);
+    ledControl(GREEN_LED, led_off);
+    osThreadFlagsSet(redLED_Id, 0x00000001);
+    osDelay(1000);
+  }
+}
+
+void led_blue_thread(void *argument) {
+  for (;;) {
+    osThreadFlagsWait(0x00000001, osFlagsWaitAny, osWaitForever);
+    ledControl(BLUE_LED, led_on);
+    osDelay(1000);
+    ledControl(BLUE_LED, led_off);
+    osThreadFlagsSet(redLED_ID, 0x00000002);
+    osDelay(1000);
+  }
+}
+
+
+3.
+
+
+void task1 (void *argument) {
+  for (;;) {
+    osMutexAcquire(mutex_id, osWaitForever);
+    count++;
+    osMutexRelease(mutex_id, osWaitForever);
+  }
+}
+
+void task2 (void *argument) {
+  for (;;) {
+    osMutexAcquire(mutex_id, osWaitForever);
+    if (count >= 10) {
+       count = 0;
+    }
+    osMutexRelease(mutex_id, osWaitForever);
+  }
+}
+
+4.
+
+void task1 (void *argument) {
+  for (;;) {
+    count++;
+    if (count >= 10) {
+      osEventFlagSet(ge10, 0x0001);
+      osEventFlagsWait(ge10, 0x0002, osFlagsWaitAll, osWaitForever); (need this to go to BLOCKED state else task1 always running since higher priority)
+    }
+  }
+}
+
+void task2 (void *argument) {
+  for (;;) {
+    osEventFlagsWait(ge10, 0x0001, osFlagsWaitAll, osWaitForever);
+    count = 0;
+    osEventFlagSet(ge10, 0x0002);
+  }
+}

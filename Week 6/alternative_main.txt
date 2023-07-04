@@ -1,0 +1,39 @@
+//UART RGB polling
+
+		
+	UART2_Transmit_Poll(0x31);
+		rx_data = UART2_Receive_Poll();
+		
+		execute_data(rx_data);
+		delay(0x80000);
+		
+		UART2_Transmit_Poll(0x30);
+		rx_data = UART2_Receive_Poll();
+		
+		execute_data(rx_data);
+		delay(0x80000);
+		
+		
+		UART2_Transmit_Poll(0x33);
+		rx_data = UART2_Receive_Poll();
+		
+		execute_data(rx_data);
+		delay(0x80000);
+		
+		UART2_Transmit_Poll(0x32);
+		rx_data = UART2_Receive_Poll();
+		
+		execute_data(rx_data);
+		delay(0x80000);
+		
+		UART2_Transmit_Poll(0x35);
+		rx_data = UART2_Receive_Poll();
+		
+		execute_data(rx_data);
+		delay(0x80000);
+		
+		UART2_Transmit_Poll(0x34);
+		rx_data = UART2_Receive_Poll();
+		
+		execute_data(rx_data);
+		delay(0x80000);

@@ -1,0 +1,109 @@
+uint8_t forward_flag = 0;
+uint8_t reverse_flag = 0;
+uint8_t left_flag = 0;
+uint8_t right_flag = 0;
+uint8_t hardleft_flag = 0;
+uint8_t hardright_flag = 0;
+uint8_t boost_flag = 0;
+uint8_t slow_flag = 0;
+
+void move(uint8_t move_data, uint8_t FLspeed, uint8_t FRspeed, uint8_t BLspeed, uint8_t BRspeed) {
+	switch(move_data) {
+	case 0x00: //Stop
+		stop();
+		break;
+	case 0x11: //Forward
+		controlWheelSpeed(FLF,FLspeed);
+		controlWheelSpeed(FLR,0);
+		controlWheelSpeed(FRF,FRspeed);
+		controlWheelSpeed(FRR,0);
+		controlWheelSpeed(BLF,BLspeed);
+		controlWheelSpeed(BLR,0);
+		controlWheelSpeed(BRF,BRspeed);
+		controlWheelSpeed(BRR,0);
+		break;
+	case 0x12: //Forward Left
+		controlWheelSpeed(FLF,0);
+		controlWheelSpeed(FLR,FLspeed);
+		controlWheelSpeed(FRF,FRspeed);
+		controlWheelSpeed(FRR,0);
+		controlWheelSpeed(BLF,BLspeed/2);
+		controlWheelSpeed(BLR,0);
+		controlWheelSpeed(BRF,BRspeed/2);
+		controlWheelSpeed(BRR,0);
+		break;
+	case 0x13: //Left
+		controlWheelSpeed(FLF,0);
+		controlWheelSpeed(FLR,FLspeed);
+		controlWheelSpeed(FRF,FRspeed);
+		controlWheelSpeed(FRR,0);
+		controlWheelSpeed(BLF,0);
+		controlWheelSpeed(BLR,BLspeed);
+		controlWheelSpeed(BRF,BRspeed);
+		controlWheelSpeed(BRR,0);
+		break;
+	case 0x14: //Forward Right
+		controlWheelSpeed(FLF,FLspeed);
+		controlWheelSpeed(FLR,0);
+		controlWheelSpeed(FRF,0);
+		controlWheelSpeed(FRR,FRspeed);
+		controlWheelSpeed(BLF,BLspeed/2);
+		controlWheelSpeed(BLR,0);
+		controlWheelSpeed(BRF,BRspeed/2);
+		controlWheelSpeed(BRR,0);
+		break;
+	case 0x15: //Right
+		controlWheelSpeed(FLF,FLspeed);
+		controlWheelSpeed(FLR,0);
+		controlWheelSpeed(FRF,0);
+		controlWheelSpeed(FRR,FRspeed);
+		controlWheelSpeed(BLF,BLspeed);
+		controlWheelSpeed(BLR,0);
+		controlWheelSpeed(BRF,0);
+		controlWheelSpeed(BRR,BRspeed);
+		break;
+	case 0x16: //Reverse
+		controlWheelSpeed(FLF,0);
+		controlWheelSpeed(FLR,FLspeed);
+		controlWheelSpeed(FRF,0);
+		controlWheelSpeed(FRR,FRspeed);
+		controlWheelSpeed(BLF,0);
+		controlWheelSpeed(BLR,BLspeed);
+		controlWheelSpeed(BRF,0);
+		controlWheelSpeed(BRR,BRspeed);
+		break;
+	case 0x17: //Reverse Left
+		controlWheelSpeed(FLF,0);
+		controlWheelSpeed(FLR,FLspeed/2);
+		controlWheelSpeed(FRF,0);
+		controlWheelSpeed(FRR,FRspeed/2);
+		controlWheelSpeed(BLF,BLspeed);
+		controlWheelSpeed(BLR,0);
+		controlWheelSpeed(BRF,0);
+		controlWheelSpeed(BRR,BRspeed);
+		break;
+	case 0x18: //Reverse Right
+		controlWheelSpeed(FLF,0);
+		controlWheelSpeed(FLR,FLspeed/2);
+		controlWheelSpeed(FRF,0);
+		controlWheelSpeed(FRR,FRspeed/2);
+		controlWheelSpeed(BLF,0);
+		controlWheelSpeed(BLR,BLspeed);
+		controlWheelSpeed(BRF,BRspeed);
+		controlWheelSpeed(BRR,0);
+		break;
+	case 0x19: //Boost
+		controlWheelSpeed(FLF,100);
+		controlWheelSpeed(FLR,0);
+		controlWheelSpeed(FRF,100);
+		controlWheelSpeed(FRR,0);
+		controlWheelSpeed(BLF,100);
+		controlWheelSpeed(BLR,0);
+		controlWheelSpeed(BRF,100);
+		controlWheelSpeed(BRR,0);
+		break;
+	default:
+		stop();
+		break;
+	}
+}

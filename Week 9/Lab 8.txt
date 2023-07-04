@@ -1,0 +1,116 @@
+mySem = osSemaphoreNew(1, 1, NULL); binary semaphore very similar to Mutex
+
+mySem = osSemaphoreNew(1, 0, NULL); binary semaphore with initial count set to 0 
+meaning event to unblock threads has not happened yet
+
+
+Q1 Explain the THREE parameters that are passed when we call osSemaphoreNew().
+
+
+osSemaphoreId_t osSemaphoreNew	(	uint32_t 	max_count,
+					uint32_t 	initial_count,
+					const osSemaphoreAttr_t * 	attr )		
+
+
+[in]	max_count	maximum number of available tokens.
+[in]	initial_count	initial number of available tokens.
+[in]	attr	semaphore attributes; NULL: default values
+
+The parameter max_count specifies the maximum number of available tokens. A max_count value of 1 creates a binary semaphore.
+
+The parameter initial_count sets the initial number of available tokens.
+
+The parameter attr specifies additional semaphore attributes. Default attributes will be used if set to NULL.
+
+This function cannot be called from Interrupt Service Routines.
+
+Q2 mySem = osSemaphoreNew(1, 0, NULL); and tasks never release semaphore
+
+LED does not blink
+
+Initial count for semaphore is 0 and semaphore is never released by any task or interrupt. 
+Hence red and green threads will forever be in the BLOCKED state when trying to acquire semaphore because of osWaitForever
+
+If timeout value is 0, thread will continue to use shared resource even without acquiring semaphore.
+To control this, need check status of acquire and use if else 
+
+Q3 pushbutton releases semaphore
+
+Initially LED not blinking because both tasks try to acquire semaphore but initial count is 0
+
+When pushbutton pressed, semaphore released, red blinks once and semaphore count back to 0
+When pushbutton pressed again, semaphore released, green next in queue acquires semaphore, green blinks once
+
+alternate
+
+
+
+Q4 UART ISR releases semaphore when data packet comes in
+
+void UART2_IRQHandler(void) {
+	NVIC_ClearPendingIRQ(UART2_IRQn);
+	
+	//receiver
+	if(UART2->S1 & UART_S1_RDRF_MASK) { //RDRF = 1 when UART2_D is full
+		osSemaphoreRelease(mySem); // release semaphore when receiving data packet
+		rx_data = UART2->D; //RDRF = 0 (clears) after reading from UART2_D
+	}
+	
+	//error cases
+	if (UART2->S1 & (UART_S1_OR_MASK 
+                  | UART_S1_NF_MASK
+                  | UART_S1_FE_MASK 
+                  | UART_S1_PF_MASK)) {
+    // handle the error
+    
+    // clear the flag
+  }
+}
+
+
+Q5 what happens to RGB when send data through UART?
+
+same as Q3, UART releases semaphore
+
+Initially LED not blinking because both tasks try to acquire semaphore but initial count is 0
+
+When any command sent, semaphore released, red blinks once and semaphore count back to 0
+When any command sent again, semaphore released, green next in queue acquires semaphore, green blinks once
+
+Q6 2 different semaphores to control different colours depending on command sent
+
+osSemaphoreId_t redSem;
+osSemaphoreId_t greenSem;
+
+redSem = osSemaphoreNew(1, 0, NULL);
+greenSem = osSemaphoreNew(1, 0, NULL);
+
+data decoded in UART IRQ to release appropriate semaphore
+
+void UART2_IRQHandler(void) {
+	NVIC_ClearPendingIRQ(UART2_IRQn);
+	
+	//receiver
+	if(UART2->S1 & UART_S1_RDRF_MASK) { //RDRF = 1 when UART2_D is full
+		//osSemaphoreRelease(mySem); // release semaphore when receiving data packet
+		rx_data = UART2->D; //RDRF = 0 (clears) after reading from UART2_D
+		if(FUNCTION_MASK(rx_data) == LED_FUNCTION) {
+			if(LED_MASK(rx_data) == LED_RED_ON) {
+				osSemaphoreRelease(redSem);
+			}
+			if(LED_MASK(rx_data) == LED_GREEN_ON) {
+				osSemaphoreRelease(greenSem);
+			}
+		}
+	}
+	
+	//error cases
+	if (UART2->S1 & (UART_S1_OR_MASK 
+                  | UART_S1_NF_MASK
+                  | UART_S1_FE_MASK 
+                  | UART_S1_PF_MASK)) {
+    // handle the error
+    
+    // clear the flag
+  }
+}

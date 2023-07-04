@@ -1,0 +1,203 @@
+1. What is meant by unbounded priority inversion?
+
+
+3.
+
+typedef struct{
+  uint8_t opnum;
+  uint8_t firstnum;
+  uint8_t secondnum;
+} myDataPkt;
+
+osMessageQueueId_t calcMsg, resultMsg;
+calcMsg = osMessageQueueNew(1, sizeof(myDataPkt), NULL);
+resultMsg = osMessageQueueNew(1, sizeof(myDataPkt), NULL);
+
+osThreadId_t taskop_Id;
+taskop_id = osThreadNew(taskop_Id, NULL, NULL);
+
+void TaskInput(void *argument) {
+
+  int firstnum, secondnum;
+  myDataPkt myData;
+  for (;;) {
+
+  printf("Enter First Number: ");
+  scanf("%d\n", firstnum);
+  osThreadFlagsSet(taskop_id, 0x0001); 
+  osMessageQueueGet(calcMsg, &myData, NULL, osWaitForever);
+  printf("Enter Second Number: ");
+  scanf("%d\n", secondnum);
+  myData.firstnum = firstnum;
+  myData.secondnum = secondnum;
+  osMessageQueuePut(resultMsg, &myData, NULL, 0);
+  osThreadFlagsWait(0x0001, osFlagsWaitAny, osWaitForever);
+  }
+}
+
+void TaskOp(void *argument) {
+
+  int opnum;
+  myDataPkt myData;
+
+  
+  osThreadFlagsWait(0x0001, osFlagsWaitAny, osWaitForever);
+  printf("These are the supported operations.\n ");
+  printf("1. Add\n ");
+  printf("2. Subtract\n ");
+  printf("3. Multiply\n ");
+  printf("4. Divide\n ");
+  printf("Enter desired operation: ");
+  scanf("%d\n", opnum);
+
+  myData.opnum = opnum;
+  osMessageQueuePut(calcMsg, &myData, NULL, 0);
+}
+
+void TaskResult(void *argument) {
+
+  int firstnum, secondnum, op, result;
+  myDataPkt myData;
+
+  osMessageQueueGet(resultMsg, &myData, NULL, osWaitForever);
+  if (myData.op == 1) {
+    result = myData.firstnum + myData.secondnum;
+  }
+  if (myData.op == 2) {
+    result = myData.firstnum - myData.secondnum;
+  }
+  if (myData.op == 3) {
+    result = myData.firstnum * myData.secondnum;
+  }
+  if (myData.op == 4) {
+    result = myData.firstnum / myData.secondnum;
+  }
+  printf("Result: %d\n", result);
+  osThreadFlagsSet(taskinput_id, 0x0001);
+}
+
+
+
+
+
+osThreadId_t redLED_ID;
+osThreadId_t greenLED_ID;
+osThreadId_t blueLED_ID;
+
+redLED_ID = osThreadNew(led_red_thread, NULL, NULL);
+greenLED_ID = osThreadNew(led_green_thread, NULL, NULL);
+blueLED_ID = osThreadNew(led_blue_thread, NULL, NULL);
+
+void led_red_thread(void *argument){
+  for (;;){
+    osThreadFlagsWait(0x0003, osFlagsWaitAll, osWaitForever);
+    ledControl(RED_LED, led_on);
+    osDelay(1000);
+    //OFF red led
+  }
+}
+
+void led_green_thread (void *argument) {
+  for (;;) {
+    //ON green led
+    osDelay(1000);
+    osThreadFlagsSet(blueLED_ID, 0x0001);
+    osDelay(1000);
+    osThreadFlagsSet(redLED_ID, 0x0001);
+    //OFF green led
+    osDelay(1000);
+  }
+}
+
+void led_blue_thread (void *argument) {
+  for (;;) {
+    osThreadFlagsWait(0x0001, osFlagsWaitAny, osWaitForever);
+    //ON blue led
+    osDelay(1000);
+    osThreadFlagsSet(redLED_ID, 0x0002);
+    //OFF blue led
+  }
+}
+
+osMutexId_t countMutex;
+
+countMutex = osMutexNew(NULL);
+
+void task1 (void *argument) {
+  for (;;){
+    osMutexAcquire(countMutex, osWaitForever);
+    count++;
+    osMutexRelease(countMutex);
+  }
+}
+
+void task2 (void *argument) {
+  for (;;){
+    osMutexAcquire(countMutex, osWaitForever);
+    if (count >= 10) {
+      count = 0;
+    }
+    osMutexRelease(countMutex);
+  }
+}
+
+osEventFlagId_t resetEvent, countEvent;
+
+resetEvent = osEventFlagsNew(NULL);
+countEvent = osEventFlagsNew(NULL);
+
+void task1 (void *argument){
+  for (;;){
+    count++;
+    if (count >= 10) [
+      osEventFlagsSet(resetEvent, 0x0001); 
+    }
+    osEventFlagsWait(countEvent, 0x0001, osFlagsWaitAny, osWaitForever);
+  }
+}
+
+void task2 (void *argument){
+  for (;;){
+    osEventFlagsWait(resetEvent, 0x0001, osFlagsWaitAny, osWaitForever);
+    count = 0;
+    osEventFlagsSet(countEvent, 0x0001);
+  }
+}
+
+osMutexId_t myMutex
+myMutex = osMutexNew(NULL);
+osMutexAcquire(myMutex, osWaitForever);
+osMutexRelease(myMutex)
+
+osSemaphoreId_t mySem
+mySem = osSemaphoreNew(1,0,NULL)
+osSemaphoreAcquire(mySem, osWaitForever)
+osSemaphoreRelease(mySem)
+
+
+osThreadId_t redID
+redID = osThreadNew(led_red_thread, NULL, NULL)
+osThreadFlagsSet(redID, 0x0001)
+osThreadFlagsWait(0x0001, osFlagsWaitAny, osWaitForever)
+
+osEventFlagsId_t ledflag
+ledflag = osEventFlagsNew(NULL)
+osEventFlagsSet(ledflag, 0x0001)
+osEventFlagsWait(ledflag, 0x0001, osFlagsWaitAny, osWaitForever)
+
+typedef struct{
+
+}myDataPkt;
+
+osMessageQueueId_t redmsg
+
+redmsg = osMessageQueueNew(max, sizeof(myDataPkt), NULL)
+
+osMessageQueuePut(redmsg, &myData, NULL, 0)
+osMessageQueueGet(redmsg, &rxData, NULL, 0)
+
+
+
+
+
+

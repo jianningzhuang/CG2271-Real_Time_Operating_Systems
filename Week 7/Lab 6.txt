@@ -1,0 +1,217 @@
+
+SystemCoreClockUpdate(); //System Initialisation
+
+osKernelInitialize(); //set up low level support for OS
+
+1) What is the purpose of for(;;) {} in app_main?
+
+In Embedded Operating Systems, most tasks are written in forever loops
+The state of the task will determine when they get to run
+No Exit State
+
+2/3) When will app_main() be called?
+
+Not like a function call
+
+app_main() is a thread
+
+Once osKernelStart() function is called, multi-threaded environment has started
+At that time, there can be many tasks that are in the Ready State
+Only the task with the Highest Priority will run
+Priority of thread set in attr in osThreadNew(thread, arg, attr)
+
+
+4) What happens to app_main() task when we call osDelay()?
+
+https://www.keil.com/pack/doc/CMSIS/RTOS2/html/group__CMSIS__RTOS__Wait.html#gaf6055a51390ef65b6b6edc28bf47322e
+
+
+osStatus_t osDelay(uint32_t ticks)
+	
+Parameters
+[in]	ticks	time ticks value
+
+Returns
+status code that indicates the execution status of the function.
+The function osDelay waits for a time period specified in kernel ticks. For a value of 1 the system waits until the next timer tick occurs. The actual time delay may be up to one timer tick less than specified, i.e. calling osDelay(1) right before the next system tick occurs the thread is rescheduled immediately.
+
+The delayed thread is put into the BLOCKED state and a context switch occurs immediately. The thread is automatically put back to the READY state after the given amount of ticks has elapsed. If the thread will have the highest priority in READY state it will be scheduled immediately.
+
+Possible osStatus_t return values:
+
+osOK: the time delay is executed.
+osErrorParameter: the time cannot be handled (zero value).
+osErrorISR: osDelay cannot be called from Interrupt Service Routines.
+osError: osDelay cannot be executed (kernel not running or no READY thread exists).
+Note
+This function cannot be called from Interrupt Service Routines.
+
+
+Delayed Thread is put into BLOCKED state and context switch occurs immediately
+put back to READY state after ticks
+
+By default, system is configured such that 1 tick is 1 ms
+1000 ticks = 1s
+osDelay(1000);
+
+
+5) What if use normal delay?
+
+normal delay uses CPU to execute code to generate required delay
+
+osDelay() frees up CPU
+
+
+6) What are the changes you must make to rename a thread?
+
+create a new thread with osThreadNew and the corresponding function
+
+osThreadNew(led_red_thread, NULL, NULL);
+
+void led_red_thread(void *argument) {
+	for (;;) {
+		ledControl(red, led_on);
+		osDelay(1500);
+		ledControl(red, led_off);
+		osDelay(1500);
+	}
+}
+
+7) Double Blinky 2 threads same priority
+
+
+red and green ON together, OFF together => yellow
+
+context switching happens the moment we call osDelay()
+
+red could be running then blocked, then green immediately run after context switch then block, then idle for about 1s
+
+time gap between red and green very short for context switching, almost look simultaneous
+
+red thread comes out of osDelay() slightly faster
+
+8) if normal delay used, still yellow?
+
+RTX_Config.h => OS_ROBIN_TIMEOUT  5
+
+Threads with same priority level have round robin behaviour => every 5 ticks do round robin switching
+
+
+9) If OS_ROBIN_ENABLE is disabled, the led_red_thread, doesn’t give up the CPU. 
+As such, we would expect that the green_led_thread doesn’t get a chance to run. 
+The expected behaviour would be that we only observe the red led blinking.
+
+
+/*----------------------------------------------------------------------------
+ * CMSIS-RTOS 'main' function template
+ *---------------------------------------------------------------------------*/
+ 
+#include "RTE_Components.h"
+#include  CMSIS_device_header
+#include "cmsis_os2.h"
+
+#define RED_LED     18 // PortB Pin 18
+#define GREEN_LED   19 // PortB Pin 19
+#define BLUE_LED    1 // PortD Pin 1
+#define MASK(x)     (1 << (x))
+
+typedef enum {
+	red = 0,
+	green = 1,
+	blue = 2,
+} color_t;
+
+typedef enum {
+	led_off = 0,
+	led_on = 1,
+} state_t;
+ 
+
+void initLED(void) {
+	// Enable Clock to PORTB and PORTD
+	SIM->SCGC5 |= ((SIM_SCGC5_PORTB_MASK) | (SIM_SCGC5_PORTD_MASK));
+	
+	// Configure MUX settings to make all 3 pins GPIO
+	PORTB->PCR[RED_LED] &= ~PORT_PCR_MUX_MASK;
+	PORTB->PCR[RED_LED] |= PORT_PCR_MUX(1);
+	PORTB->PCR[GREEN_LED] &= ~PORT_PCR_MUX_MASK;
+	PORTB->PCR[GREEN_LED] |= PORT_PCR_MUX(1);
+	PORTD->PCR[BLUE_LED] &= ~PORT_PCR_MUX_MASK;
+	PORTD->PCR[BLUE_LED] |= PORT_PCR_MUX(1);
+	
+	// Set Data Direction Registers for PortB and PortD
+	PTB->PDDR |= (MASK(RED_LED) | MASK(GREEN_LED));
+	PTD->PDDR |= MASK(BLUE_LED);
+	
+}
+
+void offRGB(void){
+	PTB->PDOR = MASK(RED_LED) | MASK(GREEN_LED);
+	PTD->PDOR = MASK(BLUE_LED);
+}
+
+void ledControl(color_t color, state_t state){ 
+	switch (color){
+		case red:
+			if (state == led_off) {
+				PTB->PDOR |= MASK(RED_LED);
+			}
+			else {
+				PTB->PDOR &= ~MASK(RED_LED);  //active low LED
+			}
+			break;
+		case green:
+			if (state == led_off) {
+				PTB->PDOR |= MASK(GREEN_LED);
+			}
+			else {
+				PTB->PDOR &= ~MASK(GREEN_LED);  //active low LED
+			}
+			break;
+		case blue:
+			if (state == led_off) {
+				PTD->PDOR |= MASK(BLUE_LED);
+			}
+			else {
+				PTD->PDOR &= ~MASK(BLUE_LED);  //active low LED
+			}
+			break;
+		default:
+			offRGB();
+	}
+}
+
+static void delay(volatile uint32_t nof) {
+  while(nof!=0) {
+    __asm("NOP");
+    nof--;
+  }
+}
+
+/*----------------------------------------------------------------------------
+ * Application main thread
+ *---------------------------------------------------------------------------*/
+void app_main (void *argument) {
+  // ...
+  for (;;) {
+		ledControl(red, led_on);
+		osDelay(1000);
+		ledControl(red, led_off);
+		osDelay(1000);
+	}
+}
+ 
+int main (void) {
+ 
+  // System Initialization
+  SystemCoreClockUpdate();
+	initLED();
+	offRGB();
+  // ...
+ 
+  osKernelInitialize();                 // Initialize CMSIS-RTOS
+  osThreadNew(app_main, NULL, NULL);    // Create application main thread
+  osKernelStart();                      // Start thread execution
+  for (;;) {}
+}
+
